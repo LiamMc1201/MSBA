@@ -1,0 +1,126 @@
+---
+title: "Decision Tree"
+author: "Liam McGrath"
+format: html
+editor: visual
+theme: "vapor"
+---
+
+##Predicting Building Permit Decisions
+
+```{r}
+library(tidyverse)
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(readr)
+library(knitr)
+library(kableExtra)
+```
+
+
+##1.Collecting Data
+
+```{r}
+permits<- read_csv("https://s3.amazonaws.com/notredame.analytics.data/permits.csv")
+```
+
+
+## 2.Explore and Prepare The Data
+
+```{r}
+glimpse(permits)
+```
+
+```{r}
+head(permits)
+```
+
+```{r}
+summary(permits)
+```
+
+
+
+```{r}
+permits <- permits %>%
+  filter(!is.na(permitCategory))
+```
+
+
+```{r}
+permits <- permits %>%
+  mutate(across(c('valuation', 'floorArea', 'numberUnits', 'stories'), ~ ifelse(. < 1, NA, .)))
+```
+
+
+```{r}
+permits <- permits %>%
+  mutate(stories = ifelse(stories > 73, NA, stories))
+```
+
+
+```{r}
+permits <- permits %>%
+  mutate(planCheck = as.factor(ifelse(permitCategory == "Plan Check", "Yes", "No"))) %>%
+  select(-permitCategory)
+
+summary(permits)
+```
+
+
+```{r}
+library(caret)
+RNGkind(sample.kind = "Rounding")
+set.seed(1234)
+sample_set <- createDataPartition(y = permits$planCheck, p = .8, list = FALSE)
+permits_train <- permits[sample_set, ]
+permits_test <- permits[-sample_set, ]
+```
+
+
+##3. Train Model
+
+```{r}
+library(rpart)
+permits_mod <-
+  rpart(
+    planCheck ~ .,
+    method = "class",
+    data = permits_train,
+    cp = 0.02
+  )
+
+
+library(rpart.plot)
+rpart.plot(permits_mod)
+
+```
+
+
+
+##4. Evaluate Model
+
+```{r}
+permits_pred <- predict(permits_mod, permits_test, type = "class")
+head(permits_pred)
+```
+
+
+```{r}
+permits_test %>%
+  rename(Actual = planCheck) %>%
+  mutate(id = row_number(), Predicted = permits_pred) %>%
+  select(id, Actual, Predicted)
+```
+
+
+```{r}
+permits_test %>% summarise(Accuracy = sum(planCheck == permits_pred) / n())
+```
+
+
+
+
+
+

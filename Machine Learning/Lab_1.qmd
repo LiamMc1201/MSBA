@@ -1,0 +1,146 @@
+---
+title: "Lab 1"
+author: "Liam McGrath"
+format: html
+editor: visual
+theme: "Vapor"
+---
+
+```{r}
+library(tidyverse)
+library(lubridate)
+```
+
+
+
+
+## Problem 1 
+
+```{r}
+washers <- read_csv("C:/Users/liamm/Downloads/residentialwashers.csv")
+```
+
+
+## Problem 2
+
+```{r}
+
+summary(washers)
+
+head(washers)
+
+glimpse(washers)
+```
+
+## Problem 3
+
+```{r}
+washers <- washers %>%
+  mutate(across(c(BrandName, Configuration, Market, MostEfficient), as.factor))
+
+summary(washers[c("BrandName", "Configuration", "Market", "MostEfficient")])
+```
+
+
+## Problem 4
+
+```{r}
+washers %>%
+  count(BrandName) %>%
+  arrange(desc(n))
+```
+
+
+
+## Problem 5
+
+```{r}
+washers %>%
+  count(MostEfficient)%>%
+  arrange(desc(n))%>%
+  mutate(prop = round(n/sum(n),2))
+```
+The data is imbalanced because the majority of the washers are not the most efficient.
+
+
+## Probelm 6
+
+```{r}
+washers <- washers %>%
+  mutate(across(c(DateAvailable, DateCertified), mdy))
+
+summary(washers[c("DateAvailable", "DateCertified")])
+
+```
+## Problem 7
+
+```{r}
+
+washers %>%
+  select(DateCertified,Configuration)%>%
+mutate(month = as.factor(month(DateCertified)))%>%
+  filter(year(DateCertified)==2019)%>%
+ggplot(mapping = aes(x=month, fill = Configuration))+
+  geom_bar()
+
+
+```
+
+## Problem 8
+
+```{r}
+
+ggplot(data = washers,aes(x = EnergyUse, y = WaterUse )) +
+  geom_point()
+
+```
+
+
+## Problem 9
+
+
+```{r}
+##EnergyUse
+washers %>%
+  ggplot(mapping = aes(x = Configuration, y = EnergyUse)) + 
+  geom_boxplot()
+
+##Wateruse
+washers %>%
+  ggplot(mapping = aes(x = Configuration, y = WaterUse)) + 
+  geom_boxplot()
+
+
+
+```
+## Problem 10
+
+
+```{r}
+min_max_normalize <- function(x, upper, lower) {
+  return(((x - min(x)) / (max(x) - min(x))) * (upper - lower) + lower)
+}
+
+
+washers %>%
+  select(IMEF,IWF,MostEfficient) %>%
+  mutate(IMEF2 = min_max_normalize(IMEF,5,1)) %>%
+  mutate(IWF2 = 6 - min_max_normalize(IWF, 5, 1)) %>%
+  ggplot(mapping = aes(x = IMEF2, y = IWF2, color = MostEfficient)) +
+  geom_point()
+
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+

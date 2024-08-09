@@ -1,0 +1,270 @@
+---
+title: "Assigment 3"
+format:
+  html:
+    toc: true
+    number-sections: true
+    colorlinks: true
+---
+
+
+# Load Packages
+
+
+```{r}
+library(tidyverse)
+library(caret)
+library(performanceEstimation)
+library(rpart)
+library(xgboost)
+```
+
+
+# PART I: Collect, Explore, and Prepare the Data
+
+1\. Import and preview the data. Call the dataset loans. Remember to use the tidyverse package as much as possible. This includes making use of the read_csv() functions when importing data. Use the glimpse() function to show that your data was imported properly.
+
+
+```{r}
+loans <- read_csv("https://s3.amazonaws.com/notredame.analytics.data/lendingclub.csv")
+
+glimpse(loans)
+
+```
+
+
+2.  You notice that the Grade, EmploymentLength, HomeOwnership, IncomeVerified, LoanPurpose, and Default features were imported as string values. Convert these features to factors. Use the glimpse() function to show that your conversion worked.
+
+
+```{r}
+loans <- loans %>%
+  mutate(Grade = as.factor(Grade),
+         EmploymentLength = as.factor(EmploymentLength),
+         HomeOwnership = as.factor(HomeOwnership),
+         IncomeVerified = as.factor(IncomeVerified),
+         LoanPurpose = as.factor(LoanPurpose),
+         Default = as.factor(Default))
+
+
+glimpse(loans)
+
+```
+
+
+3.  Get descriptive statistics for the entire dataset.
+
+
+```{r}
+
+
+summary(loans)
+
+```
+
+
+4.  Split your dataset into training and test sets using stratified random sampling (with Default as the stratum). Assign 75% of your original data to the training set and 25% to the test set. Call the training set, loans_train, and the test set, loans_test. Use ‘1234’ for your seed and don’t forget to use the RNGkind() function.
+
+
+```{r}
+RNGkind(sample.kind = "Rounding")
+set.seed(1234)
+sample_set <- createDataPartition(y =  loans$Default, p = 0.75, list = FALSE)
+laons_train <- loans[sample_set, ]
+laons_test <- loans[-sample_set, ]
+
+```
+
+
+5.  Based on the descriptive statistics of the loans dataset, you notice that the dataset suffers from class imbalance. Use the smote() function from the performanceEstimation package to balance (50-50) the training set. Use ‘1234’ for your seed here as well and don’t forget to use the RNGkind() function.
+
+
+```{r}
+
+RNGkind(sample.kind = "Rounding")
+set.seed(1234)
+laons_train <- smote(Default ~ ., data = laons_train, perc.over = 100, k = 5)
+
+
+```
+
+
+6.  During the recursive partitioning process, decision trees attempt to create a split using different values for a feature. You notice that the values for the Delinquencies, Inquiries, OpenAccounts, TotalAccounts, and PublicRecords features are double-precision values. This means that the decision tree could split on OpenAccounts \<= 1.4. This makes no sense since a borrower cannot have 1.4 open accounts. To resolve this potential issue, convert these features to integers for both the training and test sets. Use the glimpse() function to show that your conversion worked.
+
+
+```{r}
+
+laons_train <- laons_train %>%
+  mutate(Delinquencies = as.integer(Delinquencies),
+         Inquiries = as.integer(Inquiries),
+         OpenAccounts = as.integer(OpenAccounts),
+         TotalAccounts = as.integer(TotalAccounts),
+         PublicRecords = as.integer(PublicRecords))
+  
+glimpse(laons_train)
+
+
+```
+
+
+# PART II: Train the Models
+
+1.  Use the train() function from the caret package to train a model based on the CART decision tree algorithm. Use 3-fold cross-validation as the resampling technique and Kappa as the performance metric. During grid search, choose the optimal complexity parameter from among the following - 0.0001, 0.0002, 0.0003, 0.0004, 0.0005, 0.0006, 0.0007, 0.0008, 0.0009, and 0.001.
+
+
+```{r} 
+grid <- expand.grid(cp = seq(from = 0.0001, to = 0.001, by = 0.0001))
+
+
+
+
+set.seed(1234)
+
+model <- train( Default ~ ., 
+               data = laons_train,  
+               method = "rpart",  
+               trControl = trainControl(method = "cv", number = 3),  
+               tuneGrid = grid,   
+               metric = "Kappa")   
+
+
+print(model)
+
+
+
+```
+
+
+2.  Use the train() function from the caret package to train a second model based on the Random Forest (rf) algorithm. Use 3-fold cross-validation as the resampling technique and Kappa as the performance metric. During grid search, choose the number of randomly selected predictors from among the following - 10, 12, and 14.
+
+
+```{r}
+
+grid_rf <- expand.grid(mtry = c(10, 12, 14))
+
+set.seed(1234)
+
+model_rf <- train(Default ~ ., 
+                  data = laons_train,  
+                  method = "rf",  
+                  trControl = trainControl(method = 'cv', number = 3),  
+                  tuneGrid = grid_rf,   
+                  metric = "Kappa") 
+
+print(model_rf)
+
+
+
+```
+
+
+3.  Use the train() function from the caret package to train a third model based on the eXtreme Gradient Boosting (xgbTree) algorithm. Use 3-fold cross-validation as the resampling technique and Kappa as the performance metric. This algorithm has seven tunable hyperparameters: ● Maximum Tree Depth: set this to 6. ● Minimum Loss Reduction: set this to 0.01. ● Minimum Sum of Instance Weights: set this to 1. ● Number of Boosting Iterations: set this to 100. ● Shrinkage (Learning Rate): evaluate values between 0.1 and 0.5 by increments of 0.05. ● Subsample Percentage: set this to 1. ● Subsample Ratio of Columns: set this to 1
+
+
+```{r}
+
+tree_grid <- expand.grid(
+  eta = seq(from = 0.1, to = 0.5, by = .05),
+  max_depth = c(6),
+    colsample_bytree = c(1), 
+    min_child_weight = c(1), 
+    subsample = c(1),
+    nrounds = c(100), 
+    gamma = c(.01)
+  )
+
+
+
+tree_mod <- train(Default ~ ., 
+                 data = laons_train,  
+                 method = "xgbTree",  
+                 trControl = ctrl_rf,   
+                 tuneGrid = trainControl(method = "cv", number = 3),  
+                 metric = "Kappa") 
+
+
+
+
+```
+
+
+# PART III: Compare the Models
+
+1.  Create and display a table with the numeric performance metrics for each model. The metrics in the table should include Accuracy, Kappa, Sensitivity, Specificity, Precision, Recall, F-Measure, and Area Under the Curve.
+
+
+```{r}
+
+mod_metrics <- function(model, data, labels, value, method){
+  library(AUC)
+  library(broom)
+  
+  ROC_curve <- predict(model, data, type = "prob") %>%
+    pull(value) %>%
+    roc(pull(data, labels))
+  
+  metrics <- predict(model, data) %>%
+    confusionMatrix(pull(data, labels), positive = value) %>%
+    tidy() %>%
+    dplyr::filter(term %in% c('accuracy','kappa','sensitivity','specificity','precision','recall','f1')) %>%
+    select(term, estimate) %>%
+    pivot_wider(names_from = term, values_from = estimate) %>%
+    mutate(approach = method) %>%
+    mutate(auc = auc(curve)) %>%
+    select(approach, everything())
+  
+  return (metrics)
+}
+
+
+performance_met <- rbind(mod_metrics(model, laons_test, "Default", "1", "Mod1"),
+                         mod_metrics(model_rf, laons_test, "Default", "1", "RF"),
+                         mod_metrics(tree_mod, laons_test, "Default", "1", "Tree"))
+
+```
+
+
+2.  Based solely on the numeric performance metrics, which model would you choose and why?
+
+I would choose the Random Forest model because it has the highest Kappa value of 0.47, which is the highest among the three models. The Random Forest model also has the highest accuracy, sensitivity, specificity, precision, recall, and F-measure values. The Random Forest model also has the highest AUC value of 0.71, which is the highest among the three models.
+
+
+3.  Plot ROC curves for each of the three models on the same chart.
+
+
+```{r}
+visual_metric <- function(model, data, labels, value, method){
+  library(AUC)
+  library(broom)
+  
+  metrics2 <- predict(model, data, type = "prob") %>%
+    pull(value) %>%
+    roc(pull(data, labels)) %>% 
+    tidy() %>% 
+    mutate(approach = method) %>% 
+    select(approach, everything())
+  
+  return (metrics2)}
+
+
+visual <- rbind(visual_metric(model, laons_test, "Default", "1", "Mod1"),
+                visual_metric(model_rf, laons_test, "Default", "1", "RF"),
+                visual_metric(tree_mod, laons_test, "Default", "1", "Tree"))
+
+
+visualization %>%
+  ggplot(aes(x = 1 - specificity, y = sensitivity, color = approach)) +
+  geom_line() +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed") +
+  labs(title = "ROC Curve",
+       x = "1 - Specificity",
+       y = "Sensitivity") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+                            
+                        
+```
+
+
+4.  Based on the numeric performance metrics and the ROC curves, which model would you choose and why?
+
+After looking at the ROC curves, I would still choose the Random Forest model because it has the highest AUC value of 0.71, which is the highest among the three models. The Random Forest model also has the highest Kappa value of 0.47, which is the highest among the three models. The Random Forest model also has the highest accuracy, sensitivity, specificity, precision, recall, and F-measure values. Therefore, I would choose the Random Forest model as the best model for this dataset.

@@ -1,0 +1,258 @@
+---
+title: "Assignment 2"
+author: "Liam McGrath"
+format:
+  html:
+    toc: true
+    toc-location: left
+    self-contained: true
+    theme: "vapor"
+---
+
+```{r}
+library(tidyverse)
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+library(e1071)
+library(caret)
+library(pROC)
+library(performanceEstimation)
+```
+
+
+
+
+# PART I: Collect, Explore, and Prepare the Data
+
+1. Import and preview the data. Call the dataset loans. Remember to use the
+tidyverse package as much as possible. This includes making use of the
+read_csv() functions when importing data. Use the glimpse() function
+to show that your data was imported properly.
+
+```{r}
+loans <- read_csv("https://s3.amazonaws.com/notredame.analytics.data/lendingclub.csv")
+
+glimpse(loans)
+```
+
+2. You notice that the Grade, EmploymentLength, HomeOwnership,
+IncomeVerified, LoanPurpose, and Default features were
+imported as string values. Convert these features to factors. Use the
+glimpse() function to show that your conversion worked.
+
+
+```{r}
+loans <- loans %>%
+  mutate(Grade = as.factor(Grade),
+         EmploymentLength = as.factor(EmploymentLength),
+         HomeOwnership = as.factor(HomeOwnership),
+         IncomeVerified = as.factor(IncomeVerified),
+         LoanPurpose = as.factor(LoanPurpose),
+         Default = as.factor(Default))
+
+glimpse(loans)
+```
+
+3. Get descriptive statistics for the entire dataset.
+
+```{r}
+summary(loans)
+```
+
+
+4. Split your dataset into training and test sets using stratified random sampling
+(with Default as the stratum). Assign 75% of your original data to the
+training set and 25% to the test set. Call the training set, loans_train,
+and the test set, loans_test. Use ‘1234’ for your seed and don’t forget to
+use the RNGkind() function.
+
+```{r}
+set.seed(1234)
+RNGkind("Mersenne-Twister")
+
+inTrain <- createDataPartition(y = loans$Default, p = 0.75, list = FALSE)
+
+loans_train <- loans[inTrain, ]
+loans_test <- loans[-inTrain, ]
+```
+
+
+5. Based on the descriptive statistics of the loans dataset, you notice that the
+dataset suffers from class imbalance. Use the smote() function from the
+performanceEstimation package to balance (50-50) the training set.
+Use ‘1234’ for your seed here as well and don’t forget to use the
+RNGkind() function
+
+```{r}
+set.seed(1234)
+
+RNGkind("Mersenne-Twister")
+
+loans_train_balanced <- smote(Default ~ ., data = loans_train, perc.over = 100, k = 5)
+
+```
+
+
+
+6. During the recursive partitioning process, decision trees attempt to create a
+split using different values for a feature. You notice that the values for the
+Delinquencies, Inquiries, OpenAccounts, TotalAccounts,
+and PublicRecords features are double-precision values. This means that
+the decision tree could split on OpenAccounts <= 1.4. This makes no
+sense since a borrower cannot have 1.4 open accounts. To resolve this
+potential issue, convert these features to integers for both the training and test
+sets. Use the glimpse() function to show that your conversion worked.
+
+```{r}
+loans_train_balanced <- loans_train_balanced %>%
+  mutate(Delinquencies = as.integer(Delinquencies),
+         Inquiries = as.integer(Inquiries),
+         OpenAccounts = as.integer(OpenAccounts),
+         TotalAccounts = as.integer(TotalAccounts),
+         PublicRecords = as.integer(PublicRecords))
+
+glimpse(loans_train_balanced)
+```
+
+
+
+# PART II: Train the Model
+
+1. Train a model using the rpart() function from the rpart package. Set the
+complexity parameter to 0.005
+
+```{r}
+loans_tree <- rpart(Default ~ ., data = loans_train_balanced, method = "class", cp = 0.005)
+```
+
+
+2. Create a visualization of the decision tree model.
+
+```{r}
+rpart.plot(loans_tree)
+```
+
+
+3. Based on the visualization, which feature is most predictive of whether a borrower will default or not default on their loan?
+
+based on the visualization, the most predictive feature of whether a borrower will default or not default on their loan is the grade of the loan. 
+
+
+ 
+
+
+# PART III: Evaluate the Model
+
+1. Using the model that you created in the previous section, predict the outcomes
+of the loans in the test dataset. Preview the first 5 predictions
+
+```{r}
+loans_test$Prediction <- predict(loans_tree, newdata = loans_test, type = "class")
+
+
+head(loans_test$Prediction, 5)
+```
+
+
+2. Add a new column to the loans_test dataset with the predicted outcome
+for each loan. Call the new column Prediction. Use the glimpse()
+function to show that the column was added.
+
+```{r}
+
+loans_test$Prediction <- predict(loans_tree, newdata = loans_test, type = "class")
+
+glimpse(loans_test)
+
+```
+
+
+3. Calculate the accuracy of your model against the test data
+
+```{r}
+confusionMatrix(loans_test$Prediction, loans_test$Default)$overall["Accuracy"]
+
+```
+
+
+# PART IV: Interpret the Results
+Assuming that the Prediction column in loans_test is what your model
+predicts will happen, while the Default column is what actually happened, answer
+the following questions:
+
+1. On average, for every loan that is paid back in full, LendingClub earns 12% of the original loan amount as profit. With this information, how much money did LendingClub make on the loans that were issued and paid back in full?
+
+```{r}
+loans_test %>%
+  filter(Prediction == "No", Default == "No") %>%
+  summarise(TotalProfit = sum(LoanAmount * 0.12))
+```
+based on the code above, LendingClub made $10814190 on the loans that were issued and paid back in full.
+
+
+
+
+2. On average, LendingClub loses 70% of the original loan amount, for everyloan that was issued and not paid back in full. How much money did LendingClub lose as a result of bad loans that were issued based on the recommendation of your model?
+
+```{r}
+
+loans_test %>%
+  filter(Prediction == "Yes", Default == "No") %>%
+  summarise(TotalLoss = sum(LoanAmount * 0.70))
+
+
+```
+on average, LendingClub lost 6008923 on the loans that were issued and not paid back in full.
+
+3. Assuming that LendingClub incurs a loan servicing cost of 2% (of the original loan amount) for every loan that it issues, did LendingClub realize a profit or a loss based on your model? Make sure to show your work as code.
+
+
+```{r}
+
+
+
+loans_test <- loans_test %>%
+  mutate(ServicingCost = LoanAmount * 0.02)
+
+summary_df <- loans_test %>%
+  group_by(Prediction) %>%
+  summarise(TotalServicingCost = sum(ServicingCost),
+            TotalProfit = sum(LoanAmount * 0.12),
+            TotalLoss = sum(LoanAmount * 0.70)) %>%
+  mutate(NetProfit = TotalProfit - TotalLoss - TotalServicingCost)
+
+print(summary_df)
+
+
+```
+
+based on the code above, LendingClub realized a profit of $12707865 based on the model.
+
+
+
+
+4. What about the opportunity cost? How much money would LendingClub
+have made from loans that your model suggested were bad but were actually
+good?
+
+```{r}
+
+
+opportunity_cost <- loans_test %>%
+  filter(Prediction == "No", Default == "No") %>%
+  mutate(PotentialProfit = LoanAmount * 0.12) %>%  # Assuming 12% 
+  summarise(TotalOpportunityCost = sum(PotentialProfit))
+
+print(opportunity_cost)
+
+
+
+
+
+
+```
+the opportunity cost for LendingClub would have been $10814190 based on the model.
+
+---

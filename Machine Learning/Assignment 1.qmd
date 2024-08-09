@@ -1,0 +1,125 @@
+---
+title: "Assignment 1"
+author: "Liam McGrath"
+format: html
+editor: visual
+theme: "vapor"
+---
+
+Load Packages
+
+```{r}
+library(tidyr)
+library(ggplot2)
+library(dplyr)
+library(readr)
+```
+
+##PART I: Collect and Describe the Data
+
+Load the inspections dataset
+
+```{r}
+
+inspections <- read_csv("https://s3.amazonaws.com/notredame.analytics.data/inspections.csv")
+
+glimpse(inspections)
+
+
+
+```
+
+Changing names and data types of the data in inspections
+
+```{r}
+
+inspections <- inspections %>%
+  rename(ID = `Inspection ID`, DBANAME = `DBA Name`, AKANAME = `AKA Name`, License = `License #`,
+         InspectionDate = `Inspection Date`,InspectionType = `Inspection Type`, 
+         FacilityType = `Facility Type`, Risk = Risk, Address = Address, City = City, State = State) %>%
+  mutate(ID = as.integer(ID), DBANAME = as.character(DBANAME), AKANAME = as.character(AKANAME), License = as.character(License), FacilityType = as.factor(FacilityType), Risk = as.factor(Risk), Address = as.character(Address), City = as.factor(City), State = as.factor(State),Zip = as.factor(Zip),Results = as.factor(Results), InspectionDate = as.character(InspectionDate), InspectionType = as.factor(InspectionType), Latitude = as.double(Latitude), Longitude = as.double(Longitude), Location = as.character(Location))
+         
+
+
+inspections$InspectionDate <- as.Date(inspections$InspectionDate, format = "%m/%d/%Y")
+
+glimpse(inspections)
+
+
+summary(inspections$City)
+
+summary(inspections$State)
+
+summary(inspections$Zip)
+
+summary(inspections$InspectionDate)
+
+summary(inspections$Longitude)
+
+summary(inspections$Latitude)
+```
+
+##PART II: Resolve Data Quality Issues
+
+Question: 1
+
+```{r}
+inspections$Zip[inspections$Zip == "60627"] <- "60827"
+
+summary(inspections$Zip)
+```
+
+
+
+Question: 2
+
+```{r}
+inspections$City[inspections$City == "BRIDEVIEW"] <- "Bridgeview"
+
+inspections$Zip[inspections$DBANAME == "STEVES 77 ICE CREAM"] <- "60455"
+
+summary(inspections$City)
+
+```
+
+
+Question: 3
+
+```{r}
+
+##Besides STEVES 77 ICE CREAM, there are two other businesses with
+##missing zip codes. To resolve these, let’s assume that businesses on the same
+##street or that are in close proximity to each other share the same zip code. Use
+##this information to resolve the missing zip codes for the remaining two
+##businesses.
+
+##find what DBA NAmes have no zip code
+
+inspections$DBANAME[is.na(inspections$Zip)]
+
+##make Chartwells and Dunkin Donuts with no zip code 60455
+
+inspections$Zip[inspections$DBANAME == "CHARTWELLS DINING SERVICES"] <- "60455"
+
+inspections$Zip[inspections$DBANAME == "DUNKIN DONUTS"] <- "60455"
+
+```
+Question 4
+
+```{r}
+zipcodes <- read_csv("C:/Users//liamm/Downloads/zipcode.csv")
+
+glimpse(zipcodes)
+```
+```{r}
+##The reference dataset contains the city, state, latitude, and longitude data for
+##most U.S. zip codes. It is sourced from the Civic Space Database. Use this
+##dataset to resolve the inconsistent city names as well as the missing values for
+##the City, State, Longitude, and Latitude features. It is safe to
+##assume that all non-missing zip codes in the inspections dataset are
+##accurate and that you can replace the city names in the inspections
+##dataset with those from the reference dataset. Hint: A join would be useful
+##here.
+
+```
+

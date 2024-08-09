@@ -1,0 +1,212 @@
+---
+title: "Assignment 2"
+author: "Liam McGrath"
+format:
+  html:
+    toc: true
+    toc-location: left
+    self-contained: true
+    theme: "vapor"
+---
+
+```{r}
+library(caret)
+library(ggplot2)
+library(pROC)
+library(tidyr)
+library(dplyr)
+library(rpart)
+library(randomForest)
+library(e1071)
+library(performanceEstimation)
+```
+
+
+
+
+
+
+
+1. Import the data, call it titanic, and convert the Survived, Sex, Cabin, and Embarked
+features to factors.
+
+https://s3.amazonaws.com/notredame.analytics.data/titanic.csv.
+
+
+```{r}
+
+titanic <- read.csv("https://s3.amazonaws.com/notredame.analytics.data/titanic.csv")
+
+titanic$Survived <- as.factor(titanic$Survived)
+titanic$Sex <- as.factor(titanic$Sex)
+titanic$Cabin <- as.factor(titanic$Cabin)
+titanic$Embarked <- as.factor(titanic$Embarked)
+
+
+
+
+```
+
+
+
+2. Get rid of any features that are not likely to be useful in the learning process.
+
+
+```{r}
+titanic <- titanic %>% select(-PassengerId, -Name, -Ticket,-Cabin)
+
+summary(titanic)
+
+```
+
+
+
+
+
+3. Deal with missing data appropriately.
+
+
+```{r}
+
+titanic <- titanic %>%
+  group_by(Sex) %>%
+  mutate(Age = ifelse(is.na(Age), mean(Age, na.rm = TRUE), Age)) %>%
+  ungroup()
+
+summary(titanic)
+
+
+
+```
+
+4. Use a stratified sampling approach to split the dataset into 80% for training and 20% for testing.
+
+```{r}
+RNGkind(sample.kind = "Rounding")
+set.seed(12334)
+sampleset <- createDataPartition(titanic$Survived,p = 0.8,list = FALSE)
+titanic_train <- titanic[sampleset,]
+titanic_test <- titanic[-sampleset,]
+```
+
+Test for Class imbalance
+
+```{r}
+titanic %>% count(Survived) %>% mutate(prop = round(n / sum(n), 4)) %>% arrange(desc(n))
+
+```
+
+
+
+5. Is there a class imbalance problem? If so, deal with it appropriately.
+```{r}
+set.seed(12334)
+
+titanic_train <- smote(Survived ~ ., data = titanic_train, perc.over = 1, perc.under = 2)
+
+titanic_train %>% count(Survived) %>% mutate(prop = round(n / sum(n), 4)) %>% arrange(desc(n))
+
+```
+
+
+
+
+6. Use the train() function from the caret package to train a Generalized Linear Model (glm).Use 3 iterations of the .632 bootstrap as the resampling technique and Kappa as the performance
+metric during grid search.
+
+
+
+```{r}
+
+set.seed(12334)
+
+glm <- train(Survived ~ ., data = titanic_train, method = "rpart",metric = "Kappa", trControl = trainControl(method = "boot632", number = 3))
+
+
+glm
+
+```
+
+
+
+
+7. Train a second model based on the Boosted Logistic Regression (LogitBoost) algorithm. This
+model has only one tunable hyperparameter - the number of boosting iterations. During the grid
+search process use 3 iterations of the .632 bootstrap as the resampling technique, Kappa as the
+performance metric, and choose the optimal number of boosting iterations from among the
+following - 1, 2, 3, 4, and 5. See the caret documentation site at “https://topepo.github.io/caret/”
+for more information about any of the supported methods.
+
+
+```{r}
+grid <- expand.grid(nIter = c(1, 2, 3, 4, 5))
+
+set.seed(12334)
+
+glm2 <- train(Survived ~ ., data = titanic_train, method = "LogitBoost",metric = "Kappa", trControl = trainControl(method = "boot632", number = 3), tuneGrid = grid)
+
+glm2
+
+```
+
+
+
+
+
+8. Train a third model based on the C5.0 Decision Tree (C5.0) algorithm. During the grid search
+process use 3 iterations of the .632 bootstrap as the resampling technique and Kappa as the
+performance metric. This algorithm has three tunable hyperparameters:
+● Model Type: set this to “tree”.
+● Number of Boosting Iterations: choose between 5, 10, 15, 20, 25, and 30.
+● Winnow: set this to FALSE.
+9. Plot ROC curves for each of the three models.
+10. Based on the ROC curves, which model would you select and why?
+
+```{r}
+
+grid2 <- expand.grid(model= "tree" ,trials = c(5, 10, 15, 20, 25, 30), winnow = FALSE)
+
+set.seed(12334)
+
+glm3 <- train(Survived ~ ., data = titanic_train, method = "C5.0",metric = "Kappa", trControl = trainControl(method = "boot632", number = 3), tuneGrid = grid2)
+
+
+glm3
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+visualization <- bind_rows(glm1, v2, v3)
+visualization %>%
+  ggplot(mapping  = aes(x = fpr, y = tpr, color = approach)) +
+  geom_line(size = 1) +
+  geom_abline(intercept = 0, slope = 1, color = "black", linetype = "dashed", size = 1) +
+  xlim(0, 1) +
+  
+
+
+
+
+

@@ -1,0 +1,153 @@
+---
+title: "Titanic Data Analysis"
+format:
+  pdf:
+    toc: true
+    number-sections: true
+    colorlinks: true
+---
+
+```{r}
+library(tidyverse)
+library(readr)
+library(caret)
+library(broom)
+```
+
+
+
+
+
+# 1.
+Load Data 
+Convert the Survived,Sex,Cabin and Embarked features to factors
+```{r}
+titanic <- read_csv("http://s3.amazonaws.com/notredame.analytics.data/titanic.csv")
+                    
+```
+
+
+# 2.
+Convert the Survived, Sex, Cabin, and Embarked features to factors
+
+
+```{r}
+
+titanic <- titanic %>%
+  mutate(Survived = as.factor(Survived))
+
+titanic <- titanic %>%
+  mutate(Sex = as.factor(Sex))
+
+titanic <- titanic %>%
+  mutate(Cabin = as.factor(Cabin))
+
+titanic <- titanic %>%
+  mutate(Embarked = as.factor(Embarked))
+                           
+```
+
+
+## 3.
+Which features do you think are useful and which are not? Get rid of any features that are not
+likely to be useful in the learning process
+
+```{r}
+
+titanic <- titanic %>%
+  select(-PassengerId,-Name,-Ticket,-Cabin,)
+
+
+summary(titanic)
+```
+## 4.
+Are there missing values in the dataset? If so, deal with them appropriately.
+
+
+```{r}
+titanic <- titanic %>%
+    group_by(Sex) %>%
+    mutate(Age = ifelse(is.na(Age),mean(Age,na.rm = TRUE),Age)) %>%
+    ungroup()
+         
+         
+         
+         
+```
+
+
+# 5.
+Use a stratified sampling approach to split the dataset into 80% for training and 20% for test.
+
+```{r}
+RNGkind(sample.kind = "Rounding")
+set.seed(12334)
+sampleset <- createDataPartition(titanic$Survived,p = 0.8,list = FALSE)
+titanic_train <- titanic[sampleset,]
+titanic_test <- titanic[-sampleset,]
+
+```
+
+
+# 6.
+
+
+```{r}
+library(performanceEstimation)
+set.seed(1234)
+titanic_train <- smote(Survived ~ .,data = titanic_train,perc.over = 1,perc.under = 2)
+titanic_train %>% count(Survived) %>% mutate(prop = round(n/sum(n),4)) %>% arrange(desc(n))
+```
+# 7.
+Train a logistic regression model using the glm() function from the stats package and display
+the output.
+
+```{r}
+titanic_mod <- glm(Survived ~ .,data = titanic_train,family = binomial)
+
+summary(titanic_mod)
+```
+
+# 8.
+Based on the model output, train a second model with only the significant features from the first
+model and display the output
+
+```{r}
+titanic_mod2 <- glm(Survived ~ . - Parch - Fare, data = titanic_train,family = binomial)
+
+
+summary(titanic_mod2)
+
+```
+
+
+
+# 9.
+Examine the model coefficients for the second model you created. What impact does Age have
+on the odds of a passenger surviving the shipwreck?
+
+```{r}
+
+tidy(titanic_mod2) %>%
+  select(term,estimate) %>%
+  filter(term == "Age") %>%
+  mutate(odds = exp(estimate))
+
+
+
+```
+
+
+
+# 10.
+What about the gender of the passenger? Who was more likely to survive the accident, men or
+women?
+
+```{r}
+tidy(titanic_mod) %>%
+  select(term,estimate) %>%
+  filter(term == "Sexmale") %>%
+  mutate(odds = exp(estimate))
+```
+
+

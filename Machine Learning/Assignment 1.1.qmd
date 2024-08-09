@@ -1,0 +1,166 @@
+---
+title: "Assignment 1"
+author: "Liam McGrath"
+format: html
+editor: visual
+theme: "vapor"
+---
+
+Load Packages
+
+```{r}
+library(tidyr)
+library(ggplot2)
+library(dplyr)
+library(readr)
+library(stringr)
+```
+
+##PART I: Collect and Describe the Data
+
+Load the inspections dataset
+
+```{r}
+
+inspections <- read_csv("https://s3.amazonaws.com/notredame.analytics.data/inspections.csv")
+
+glimpse(inspections)
+
+
+
+```
+
+Changing names and data types of the data in inspections
+
+```{r}
+
+inspections <- inspections %>%
+  rename(ID = `Inspection ID`, DBANAME = `DBA Name`, AKANAME = `AKA Name`, License = `License #`,
+         InspectionDate = `Inspection Date`,InspectionType = `Inspection Type`, 
+         FacilityType = `Facility Type`, Risk = Risk, Address = Address, City = City, State = State) %>%
+  mutate(ID = as.integer(ID), DBANAME = as.character(DBANAME), AKANAME = as.character(AKANAME), License = as.character(License), FacilityType = as.factor(FacilityType), Risk = as.factor(Risk), Address = as.character(Address), City = as.factor(City), State = as.factor(State),Zip = as.factor(Zip),Results = as.factor(Results), InspectionDate = as.character(InspectionDate), InspectionType = as.factor(InspectionType), Latitude = as.double(Latitude), Longitude = as.double(Longitude), Location = as.character(Location))
+         
+
+
+inspections$InspectionDate <- as.Date(inspections$InspectionDate, format = "%m/%d/%Y")
+
+glimpse(inspections)
+
+
+summary(inspections$City)
+
+summary(inspections$State)
+
+summary(inspections$Zip)
+
+summary(inspections$InspectionDate)
+
+summary(inspections$Longitude)
+
+summary(inspections$Latitude)
+```
+
+##PART II: Resolve Data Quality Issues
+
+Question: 1
+
+```{r}
+inspections$Zip[inspections$Zip == "60627"] <- "60827"
+
+summary(inspections$Zip)
+```
+
+Question: 2
+
+```{r}
+inspections$City[inspections$City == "BRIDEVIEW"] <- "Bridgeview"
+
+inspections$Zip[inspections$DBANAME == "STEVES 77 ICE CREAM"] <- "60455"
+
+summary(inspections$City)
+
+```
+
+Question: 3
+
+```{r}
+
+inspections$DBANAME[is.na(inspections$Zip)]
+
+inspections$Zip[inspections$DBANAME == "CHARTWELLS"] <- "60455"
+
+inspections$Zip[inspections$DBANAME == "DUNKIN DONUTS"] <- "60455"
+
+```
+
+Question 4
+
+```{r}
+zipcodes <- read_csv("C:/Users//liamm/Downloads/zipcode.csv")
+
+glimpse(zipcodes)
+```
+
+
+
+```{r}
+
+
+inspections <- left_join(inspections, zipcodes, by = c("Zip" = "zip"))
+
+glimpse(inspections)
+
+
+
+inspections <- inspections %>%
+  select(-City, -State, -Latitude, -Longitude)
+
+
+
+inspections <- inspections %>%
+  mutate(city = as.factor(city), state = as.factor(state), Zip = as.factor(Zip), latitude = as.double(latitude), longitude = as.double(longitude))
+
+glimpse(inspections)
+```
+
+
+Question 6
+```{r}
+
+summary(inspections$city)
+
+summary(inspections$state)
+
+summary(inspections$Zip)
+
+summary(inspections$longitude)
+
+summary(inspections$latitude)
+```
+##PART III: Visualize and Interpret the Data
+
+
+Question 1
+
+```{r}
+inspections <- inspections %>%
+  mutate(ViolationCount = str_count(Violations, "\\|") + 1)
+
+```
+
+Question 2
+
+```{r}
+ggplot(inspections, aes(x = Results, y = ViolationCount)) +
+  geom_boxplot() +
+  labs(title = "Relationship between Inspection Violations and Inspection Results",
+       x = "Results",
+       y = "Violation Count")
+```
+
+
+The boxplot represnts the relationship between the number of violations and the 
+inspection results. As shown in the chart above, the number of violations seems to
+have an effect on the inspection results. The more violations that are present the lower the chance of passing is. Having a violation count above 5 typically means that you will fail your inspection.
+
+
