@@ -1,0 +1,218 @@
+---
+title: "Homework | Units 1 & 2"
+author: "Liam McGrath"
+format: html
+editor: visual
+---
+
+\`\`\`
+
+## **Use the following information to answer questions 1-6.**
+
+Souvenir Sales: The file *SouvenirSales.xls* contains monthly sales for a souvenir shop at a
+
+beach resort town in Queensland, Australia, between 1995 and 2001. Back in 2001, the
+
+store wanted to use the data to forecast sales for the next 12 months (year 2002). They
+
+hired an analyst to generate forecasts. The analyst first partitioned the data into training and
+
+validation periods, with the validation period containing the last 12 months of data (year
+
+2001). She then fit a forecasting model to sales, using the training period. Partition the data
+
+into the training and validation periods as explained above.
+
+`library(readxl)`
+
+`sales.df <- read_excel("SouvenirSales.xls")#create the time series objectsales.ts <- ts(sales.df$Sales, start = c(1995, 1), end = c(2001, 12), freq = 12)`
+
+Use tapply() to compute the average monthly souvenir sale for each month through the years 1995-2001. Match the following months with their corresponding average sale?   
+
+## Read in the data from the path "C:\Users\liamm\OneDrive - nd.edu\PTSF-Datasets\SouvenirSales.xls"
+
+
+
+```{r}
+library(readxl)
+
+sales.df <- read_excel("C:/Users/liamm/OneDrive - nd.edu/PTSF-Datasets/SouvenirSales.xls")
+```
+
+1.Use tapply() to compute the average monthly souvenir sale for each month through the years 1995-2001. Match the following months with their corresponding average sale?   
+
+```{r}
+tapply(sales.df$Sales, format(sales.df$Date, "%m"), mean)
+
+```
+
+
+2.What is the seasonal naive forecast for the validation period? (assume that you must provide
+
+forecasts for 12 months ahead)
+
+```{r}
+library(forecast)
+
+sales.ts <- ts(sales.df$Sales, start = c(1995, 1), end = c(2001, 12), freq = 12)
+```
+Consider the following codes to set up the train and validation data.
+
+stepsAhead <- 12
+
+nTrain <- length(sales.ts) - stepsAhead
+
+train.ts <- window(sales.ts, start = A, end = B)
+
+valid.ts <- window(sales.ts, start = C, end = D)
+
+Match A, B, C, and D to their corresponding argument.
+
+```{r}
+
+stepsAhead <- 12
+
+nTrain <- length(sales.ts) - stepsAhead
+
+train.ts <- window(sales.ts, start = c(1995, 1), end = c(1995,nTrain + 12))
+
+valid.ts <- window(sales.ts, start = c(1995+1), end = c(1995,nTrain))
+
+```
+
+
+4.Now, we want to build a seasonal naive forecast based on train data:
+
+library(forecast)
+seasonal<-snaive(train.ts, h=frequency(train.ts))
+seasonal_fc = forecast(seasonal)
+
+To check the forecast accuracy on the train data, we run the following code
+
+accuracy(A, B)
+
+On another hand, to check the forecast accuracy on the validation data, we would run
+
+accuracy(C, D)
+
+Match A, B, C, and D to their corresponding argument.
+
+
+```{r}
+library(forecast)
+
+seasonal<-snaive(train.ts, h=frequency(train.ts))
+
+seasonal_fc = forecast(seasonal)
+
+accuracy(train.ts, seasonal_fc$fitted)
+
+accuracy(valid.ts, seasonal_fc$fitted)
+```
+
+5. The MAPE of the seasonal naive forecast on the validation data set is:
+
+
+```{r}
+accuracy(valid.ts, seasonal_fc$fitted)[,5]
+
+```
+
+6.Suppose the analyst found a forecasting model that gives a satisfactory performance on the validation set. What must she do to use the forecasting model for generating forecasts for year 2002?
+
+she must retrain the model using the entire data set (training and validation) and then forecast the next 12 months.
+
+
+Spacer
+
+Use the following information for questions 7-10.
+
+Department Store Sales. The time plot in Figure 17.15 in the textbook describes actual quarterly sales for a department store over a 6-year period (data are available in DepartmentStoreSales.csv, data courtesy of Chris Albright). 
+
+Run the following codes to generate this time plot:
+
+library(readxl)
+
+#load the data
+dept.store.data<-read_excel("DepartmentStoreSales.xls")
+head(dept.store.data)
+tail(dept.store.data)
+#create the time series object for Sales and plot
+sales.all.ts <- ts(dept.store.data$Sales, freq = 4, start= 1900)
+plot(sales.all.ts)
+```{r}
+library(readxl)
+library(forecast)
+library(tseries)
+
+#load the data
+
+dept.store.data<-read_excel("C:/Users/liamm/OneDrive - nd.edu/PTSF-Datasets/DepartmentStoreSales.xls")
+
+head(dept.store.data)
+
+sales.all.ts <- ts(dept.store.data$Sales, freq = 4, start= 1900)
+plot(sales.all.ts)
+
+
+```
+
+
+7.Let's partition the time series, using the first 20 quarters as the training data. 
+
+#partition
+n.train <- 20
+n.valid <- 2
+sales.train.ts <- window(sales.all.ts, start = c(1900, 1), end = c(1900, n.train) )
+
+Which of the following is the correct code to select the validation data?
+
+```{r}
+n.train <- 20
+n.valid <- 2
+sales.train.ts <- window(sales.all.ts, start = c(1900, 1), end = c(1900, n.train) )
+```
+
+
+
+ 
+```{r}
+sales.valid.ts <- window(sales.all.ts, start = c(1900, n.train+1), end = c(1900, n.train+n.valid) )
+
+```
+ 
+
+8.Now, let's fit a regression model with an exponential trend and seasonality on sales.train.ts data set.
+
+Which of the following is the correct code for this task?
+
+```{r}
+fit <- tslm(sales.train.ts ~ trend + season)
+
+```
+
+9.Running summary(sales.lm.expo) and match the following predictors with their corresponding coefficient's estimated value?
+
+```{r}
+sales.lm.expo <- tslm(sales.train.ts ~trend + season, lambda= 0)
+
+summary(sales.lm.expo)
+
+
+```
+
+10. Use this model to forecast sales in quarters 21 and 22. Compute the RMSE (rounding to THREE decimal places) of the forecast accuracy on the validation data.
+
+RMSE = ________
+
+```{r}
+sales.fc <- forecast(sales.lm.expo, h=2)
+
+accuracy(sales.fc, sales.valid.ts)[,2]
+
+
+
+```
+
+
+

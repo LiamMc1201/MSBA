@@ -1,0 +1,282 @@
+---
+title: "R Notebook: TSF - Week2: Regression-Based Forecasting and Model Evaluations"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+plot(cars)
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
+
+
+```{r}
+library(forecast)
+library(readxl)
+Amtrak.data <- read_excel("Amtrak data.xls")
+
+ridership.ts <- ts(Amtrak.data$Ridership, start = c(1991, 1), end = c(2004, 3), freq = 12)
+
+## Figure 3-1
+# plot(ridership.ts, ylim = c(1300, 2600),  ylab = "Ridership", xlab = "Time", bty = "l", xaxt = "n", xlim = c(1991,2006.25))
+# axis(1, at = seq(1991, 2006, 1), labels = format(seq(1991, 2006, 1), digits = 2))
+# lines(c(2004.25 - 3 , 2004.25 - 3), c(0, 3500))
+# lines(c(2004.25, 2004.25), c(0, 3500))
+# text(1996.25, 2500, "Training")
+# text(2002.75, 2500, "Validation")
+# text(2005.25, 2500, "Future")
+# arrows(2004 - 3,2450,1991.25,2450,code=3,length=0.1,lwd=1,angle=30)
+# arrows(2004.5 - 3,2450,2004,2450,code=3,length=0.1,lwd=1,angle=30)
+# arrows(2004.5,2450,2006,2450,code=3,length=0.1,lwd=1,angle=30)
+
+```
+We are going to partition the data: train.ts is from Jan 1991 to Mar 2001, and valid.ts is from April 2001 to Mar 2004
+```{r}
+nValid <- 36 #this is 36 months in vaidation set
+train.ts <- window(ridership.ts, start = c(1991,1), end = c(2001,3))
+valid.ts <- window(ridership.ts,start = c(2001,4),end = c(2004,3))
+valid.ts
+
+
+#Let's consider an alternative way to build train.ts and valid.ts
+nValid <- 36
+nTrain <- length(ridership.ts) - nValid
+train.ts1<- window(ridership.ts, start = c(1991,1), end = c(1991,nTrain))
+valid.ts1 <- window(ridership.ts, start=c(1991, nTrain+1), end = c(1991, nTrain+nValid))
+valid.ts1
+```
+
+Let's build a regression based forecasting model on train.ts1
+```{r}
+linear_mod <- tslm(train.ts1 ~ trend)
+summary(linear_mod)
+#Coefficients:
+#             Estimate Std. Error t value Pr(>|t|)    
+#(Intercept) 1750.3595    29.0729  60.206   <2e-16 ***
+#trend          0.3514     0.4069   0.864     0.39    
+
+#This implies
+# y_t = 1750.3595 + 0.3514*t
+
+# For example, in Dec 1992, t would be 24, and the estimated value for y_t is
+# 1750.3595 + 0.3514*t = 1750.3595 + 0.3514*(24) = 1758.793
+linear_mod$fitted.values
+
+```
+
+We now want to forecast the value from April 2001 and Mar 2004
+```{r}
+linear_mod_pred <- forecast(linear_mod, h= nValid, level = 90)
+#linear_mod_pred$mean
+plot(linear_mod_pred)
+lines(valid.ts1)
+```
+
+We see that the linear_mod does not perform well due to the fact that it didn't capture seasonality.
+Next, we build a regression-based model that capture both trend and seasonality
+```{r}
+linear_season_mod <- tslm(train.ts1 ~ trend + season)
+summary(linear_season_mod)
+```
+Let's compute the forecast using linear_season_mod model from Apr 2001 to Mar 2004
+```{r}
+linear_season_mod_pred <- forecast(linear_season_mod, h= nValid, level = 0)
+plot(linear_season_mod_pred)
+lines(linear_mod_pred$mean, col  = 'red')
+lines(valid.ts1)
+```
+
+We can safely remove linear_mod from consideration because it lacks of seasonality.
+We now consider poly_season_mod that capture seasonality and polynomial trend
+```{r}
+poly_season_mod <- tslm(train.ts1 ~ trend + I(trend^2)+ season)
+options(scipen = 999)
+summary(poly_season_mod)
+#Coefficients:
+#               Estimate  Std. Error t value             Pr(>|t|)    
+#(Intercept) 1696.979360   27.675224  61.318 < 0.0000000000000002 ***
+#trend         -7.155851    0.729283  -9.812 < 0.0000000000000002 ***
+#I(trend^2)     0.060744    0.005698  10.660 < 0.0000000000000002 ***
+#season2      -43.245842   30.240666  -1.430              0.15556    
+#season3      260.014920   30.242281   8.598 0.000000000000066035 ***
+#season4      260.617456   31.021050   8.401 0.000000000000182636 ***
+#season5      293.796560   31.020188   9.471 0.000000000000000689 ***
+#season6      248.961476   31.019903   8.026 0.000000000001260334 ***
+#season7      360.634004   31.020165  11.626 < 0.0000000000000002 ***
+#season8      411.651344   31.020954  13.270 < 0.0000000000000002 ***
+#season9       90.316196   31.022265   2.911              0.00437 ** 
+#season10     214.603661   31.024102   6.917 0.000000000329207928 ***
+#season11     205.671137   31.026486   6.629 0.000000001339180089 ***
+#season12     242.929425   31.029448   7.829 0.000000000003442810 ***
+
+#This implies
+#y_t = 1696.979360 - -7.155851*t + 0.060744 *t^2 - -43.2458428Season2 + .... + 242.929425* Season12
+
+
+
+
+```
+
+Let's look at the forecasts gnerated by poly_season_mod
+```{r}
+poly_season_mod_pred <- forecast(poly_season_mod, h= nValid, level = 0)
+plot(poly_season_mod_pred)
+lines(linear_season_mod_pred$mean, col = 'green')
+lines(valid.ts)
+```
+It's not easy to see the difference using the graphs only. So, we are going to compute forecast accuracy by calculating the Mean Absolute Error (MAE), the Root Mean Squared Error (RMSE), and the Mean Absolute Percent Error (MAPE) 
+```{r}
+error_linear_season_mod <- valid.ts - linear_season_mod_pred$mean #forecast error = actual values- forecasted values
+MAE_linear_season_mod <- mean(abs(error_linear_season_mod)) #MAE = 1/n sum (abs(error))
+RMSE_linear_season_mod <-sqrt(mean(error_linear_season_mod^2))  #RMSE = sqrt(1/n sum (error^2))
+MAPE_linear_season_mod <- mean(abs(error_linear_season_mod/valid.ts)*100) #1/n sum(abs(error/actual)*100)
+data.frame(MAE_linear_season_mod,RMSE_linear_season_mod, MAPE_linear_season_mod)                               
+```
+We'll repeat this process for poly_season_mod
+
+```{r}
+error_poly_season_mod <- valid.ts - poly_season_mod_pred$mean #forecast error = actual values- forecasted values
+MAE_poly_season_mod <- mean(abs(error_poly_season_mod)) #MAE = 1/n sum (abs(error))
+RMSE_poly_season_mod <-sqrt(mean(error_poly_season_mod^2))  #RMSE = sqrt(1/n sum (error^2))
+MAPE_poly_season_mod <- mean(abs(error_poly_season_mod/valid.ts)*100) #1/n sum(abs(error/actual)*100)
+data.frame(MAE_poly_season_mod,RMSE_poly_season_mod, MAPE_poly_season_mod)                               
+```
+Let's compare poly_season_mod to a benchmark method: seasonal naive
+```{r}
+library(forecast)
+snaive_mod <- snaive(train.ts1, h= nValid)
+plot(poly_season_mod_pred)
+lines(snaive_mod$mean, col = 'green')
+lines(valid.ts)
+
+```
+Now, we compute forecast accuracy for the two models using accuracy() function
+```{r}
+accuracy(poly_season_mod_pred$mean, valid.ts1)
+accuracy(snaive_mod$mean, valid.ts1)
+```
+Next, we explore exponential trend regression-based time series forecasting
+if y_t follows exponential trend, then log(y_t) follows a linear trend
+```{r}
+library(forecast)
+exp_season_mod <- tslm(train.ts1 ~ trend + season, lambda = 0) #lambda = 0 indicates exponential trend
+summary(exp_season_mod)
+exp_season_mod_pred <- forecast(exp_season_mod, h= nValid, level=0)
+plot(exp_season_mod_pred)
+lines(linear_mod_pred$mean, col = 'red')
+lines(linear_season_mod_pred$mean, col = 'green')
+lines(poly_season_mod_pred$mean, col = 'pink')
+lines(snaive_mod$mean, col = 'purple')
+lines(valid.ts1)
+#log(100)
+
+
+#log(10000)
+
+```
+Let's take a closer look at the accuracy of exp_season_mod, poly_season_mod, and seasonal naive approaches.
+```{r}
+accuracy(exp_season_mod_pred$mean, valid.ts1)
+accuracy(poly_season_mod_pred$mean, valid.ts1)
+accuracy(snaive_mod$mean, valid.ts1)
+```
+
+##########Practice Problems##########
+
+Let's recall the Toy R Us example:
+Toy R Us revenue 
+1.Load the data file ToysRUsRevenues.xls to a data frame named TRUs.df. Print out the first few observations. Define TRUs.df as a quarterly time series of TRUs.df. Print out TRUs.ts 
+
+Solution:
+```{r}
+#1.
+#library(readxl)
+TRUs.df <- read_excel("ToysRUsRevenues.xls")
+
+head(TRUs.df)
+TRUs.ts <- ts(TRUs.df$`Revenue(in million $)`, start = c(1992,1), end = c(1995,4), freq = 4)
+plot(TRUs.ts, xlab = "Year", ylab = "Revenue (in million $)")
+```
+
+2.Use t.apply() to calculate the average revenue of each quarter through out the years. Name this new series Quarterly.TRUs.df and plot it out. 
+
+```{r}
+#2.
+help("tapply")
+Quarterly.TRUs.ts <- tapply(TRUs.ts, cycle(TRUs.ts), mean)
+plot(Quarterly.TRUs.ts, xlab = "Quarter", ylab = "Average Revenue (in million $)", type = "l", xaxt = 'n')
+
+## set x labels
+axis(1, at = c(1:4), labels = c("Q1","Q2","Q3", "Q4"))
+
+```
+3.Use aggregate() function to compute the average revenue for each year and draw a time plot to see how the revenue behaves throughout the years.
+```{r}
+#3.
+annual.TRUs.ts <- aggregate(TRUs.ts, FUN = mean)
+plot(annual.TRUs.ts, xlab = "Year", ylab = "Average Revenue (in million $)", xaxt='n')
+axis(1,at=c(1991:1995))
+
+
+
+```
+4. Partition the data so that the last four quarters are in validation. Everything before that is in training data. Build a model that capture both trend and seasonality on training data
+```{r}
+nValid <- #Fill your codes here
+nTrain <- #Fill your codes here
+train.ts <- #Fill your codes here
+valid.ts <- #Fill your codes here
+
+TRUs.mod1 <- #Fill your codes here
+
+```
+5. Use forecast() to build forecast for the module from part 4. with nValid = 4. Plot the forecasts and compare to the validation data.
+```{r}
+TRUs.mod1.pred <- #Fill your codes here
+#Fill your codes below to plot both the forecasts and the validation data
+  
+  
+```
+
+6. Compute RMSE and MAPE "manually" with R on both training and validation set
+```{r}
+train.res <- #Fill your codes here
+valid.res <- #Fill your codes here
+train.RMSE <- #Fill your codes here
+valid.RMSE <- #Fill your codes here
+train.MAPE <- #Fill your codes here
+valid.MAPE <- #Fill your codes here
+data.frame(RMSE_train = train.RMSE,MAPE_train = train.MAPE, RMSE_valid = valid.RMSE, MAPE_valid = valid.MAPE )
+```
+
+7. Check the results above with the outcomes from using accuracy() function
+```{r}
+#Fill your codes below using accuracy() funtion on both training and validation data
+
+```
+
+8. Compare the forecast accuracy from the above models with naive, seasonal naive, and average of past value method:
+```{r}
+naive.pred <- #Fill your codes here for native method
+snaive.pred <- #Fill your codes here for seasonal naive method
+mean.pred <- #Fill your codes here for average of past values
+
+#Fill your codes below to plot data with all of the forecasts
+
+  
+  
+#Fill your codes below to apply accuracy() function to all of the forecasts and compare the forecast accuracy 
+
+  
+  
+```
+

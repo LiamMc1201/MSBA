@@ -1,0 +1,93 @@
+import yfinance as yf
+import pandas as pd
+import datetime
+
+def get_asset_type(ticker):
+    """Determine the asset type for a given ticker symbol."""
+    # For simplicity, assume all retrieved tickers are stocks
+    return 'Stock'
+
+if __name__ == "__main__":
+    # Define the list of S&P 500 tickers
+    sp500_tickers = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')[0]['Symbol'].tolist()
+    
+    # Calculate start and end dates for the past 10 years
+    end_date = datetime.datetime.now().strftime('%Y-%m-%d')
+    start_date = (datetime.datetime.now() - datetime.timedelta(days=10*365)).strftime('%Y-%m-%d')
+    
+    # Create an empty list to store DataFrame objects for each ticker
+    all_data = []
+    
+    # Set the maximum number of rows per ticker (adjust as needed)
+    max_rows_per_ticker = 1000
+    
+    # Retrieve historical data for each S&P 500 ticker
+    for ticker_symbol in sp500_tickers:
+        try:
+            # Retrieve historical data for the current ticker
+            historical_data = yf.download(ticker_symbol, start=start_date, end=end_date)
+            
+            # Truncate the historical data to the maximum number of rows per ticker
+            if len(historical_data) > max_rows_per_ticker:
+                historical_data = historical_data.iloc[-max_rows_per_ticker:].copy()  # Create a copy
+            
+            # Determine the asset type for the current ticker
+            asset_type = get_asset_type(ticker_symbol)
+            
+            # Add columns for asset type and ticker to the DataFrame
+            historical_data['Asset Type'] = asset_type
+            historical_data['Ticker'] = ticker_symbol
+            
+            # Append the DataFrame to the list of all data
+            all_data.append(historical_data)
+        
+        except Exception as e:
+            print(f"Error retrieving data for {ticker_symbol}: {e}")
+    
+    # Filter out empty DataFrames before concatenating
+    all_data = [df for df in all_data if not df.empty]
+    
+    # Concatenate all DataFrames into a single DataFrame
+    if all_data:
+        combined_data = pd.concat(all_data)
+        
+        # Limit the number of rows to be exported to Excel
+        if len(combined_data) > max_rows_per_ticker * len(sp500_tickers):
+            combined_data = combined_data.iloc[:max_rows_per_ticker * len(sp500_tickers)]
+        
+        # Define the Excel file path
+        excel_filename = "historical_data_sp500.xlsx"
+        
+        # Export combined data to Excel with the specified file path
+        combined_data.to_excel(excel_filename, engine='openpyxl')
+        
+        print(f"Data for S&P 500 tickers exported to {excel_filename}")
+    else:
+        print("No data available for any S&P 500 tickers.")
+
+
+
+
+
+
+
+    
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

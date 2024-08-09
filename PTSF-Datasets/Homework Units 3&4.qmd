@@ -1,0 +1,351 @@
+---
+title: "Homework Units 3&4"
+author: "Liam McGrath"
+format: html
+editor: visual
+theme: vapor
+---
+
+## 
+
+
+
+
+Given the following time series
+
+Period (in weeks)	Time series value
+1	10
+2	14
+3	20
+4	18
+5	22
+If we use a three-week moving average to forecast, what would be the forecast for week 6? Round your answer to TWO decimal places when necessary.
+
+```{r}
+
+library(zoo)
+
+time_series <- c(10, 14, 20, 18, 22)
+
+
+moving_avg <- rollmean(time_series, k = 3, fill = NA, align = "right")
+
+forecast_week_6 <- tail(moving_avg, n = 1)
+
+
+print(round(forecast_week_6, 2))
+
+```
+
+Forecasting Wal-Mart Stock : 
+
+walmart<-read_excel("WalMartStock.xls")
+
+Here, we focus on the Wal-Mart daily closing prices between February 2001 and February 2002. The data is available at finance.yahoo.com and in WalMartStock.xls.
+
+Which of the following codes produces the following time plot of the differenced series for the Wal-Mart daily closing prices?
+
+"C:\Users\liamm\OneDrive - nd.edu\PTSF-Datasets\WalMartStock.xls"
+
+
+```{r}
+
+library(readxl)
+library(ggplot2)
+
+
+walmart <- read_excel("C:/Users/liamm/OneDrive - nd.edu/PTSF-Datasets/WalMartStock.xls")
+
+
+#A
+plot.ts(walmart$Close)
+
+#B
+plot.ts(diff(walmart$Close))
+
+
+#C
+plot(diff(walmart$Close))
+
+
+plot(walmart$Close)
+```
+##Random Walk Model
+
+```{r}
+
+library(forecast)
+
+
+time_series <- c(10, 14, 20, 18, 22)
+
+
+random_walk_model <- rwf(time_series, h = 1)
+
+
+
+forecasted_value <- random_walk_model$mean
+
+
+
+print(forecasted_value)
+
+
+
+plot(random_walk_model)
+
+
+
+```
+
+
+##Question 6
+Forecasting Wal-Mart Stock : Recreate the AR(1) model output for the Close price series by running the following codes.
+
+fit <-Arima(walmart$Close, order=c(1,0,0))
+
+fit2 <-Arima(diff(walmart$Close, 1), order=c(1,0,0))
+
+summary(fit)
+
+summary(fit2)
+
+Acf(walmart$Close, lag.max = 12, main = ””)
+
+Acf(diff(walmart$Close), lag.max = 12, main = ””)
+
+At significance level 
+ = 0.01, does the AR model indicate that this is a random walk? Explain how you reached your conclusion in your supported R notebook file.
+
+walmart stock is found in path "C:\Users\liamm\OneDrive - nd.edu\PTSF-Datasets\WalMartStock.xls"
+
+```{r}
+library(readxl)
+library(forecast)
+library(tseries)
+
+
+file_path <- "C:/Users/liamm/OneDrive - nd.edu/PTSF-Datasets/WalMartStock.xls"
+walmart <- read_excel(file_path)
+
+
+fit <- Arima(walmart$Close, order=c(1,0,0))
+
+
+fit2 <- Arima(diff(walmart$Close, 1), order=c(1,0,0))
+
+
+summary(fit)
+summary(fit2)
+
+
+par(mfrow=c(1,2)) 
+Acf(walmart$Close, lag.max = 12, main = "ACF of Close Price")
+Acf(diff(walmart$Close), lag.max = 12, main = "ACF of Differenced Close Price")
+
+
+
+
+
+
+
+
+
+```
+
+##Question 7
+
+Use the following information for questions 5-10.
+
+Souvenir Sales : The file SouvenirSales.csv contains monthly sales for a souvenir shop at a
+
+beach resort town in Queensland, Australia, between 1995 and 2001. Back in 2001, the
+
+store wanted to use the data to forecast sales for the next 12 months (year 2002). They
+
+hired an analyst to generate forecasts. The analyst first partitioned the data into training and
+
+validation periods, with the validation set containing the last 12 months of data (year 2001).
+
+She then fit a regression model to sales, using the training period.
+
+sales.df <- read_excel("SouvenirSales.xls")
+
+sales.ts <- ts(sales.df$Sales, start = c(1995, 1), end = c(2001, 12), freq = 12)
+
+nValid <- 12
+
+nTrain <- length(sales.ts) - nValid
+
+train.ts <- window(sales.ts, start = c(1995, 1), end = c(1995, nTrain))
+
+valid.ts <- window(sales.ts, start = c(1995, nTrain + 1), end = c(1995, nTrain + nValid))
+
+```{r}
+library(readxl)
+library(forecast)
+
+
+sales.df <- read_excel("C:/Users/liamm/OneDrive - nd.edu/PTSF-Datasets/SouvenirSales.xls")
+
+sales.ts <- ts(sales.df$Sales, start = c(1995, 1), end = c(2001, 12), freq = 12)
+
+nValid <- 12
+
+
+nTrain <- length(sales.ts) - nValid
+
+train.ts <- window(sales.ts, start = c(1995, 1), end = c(1995, nTrain))
+
+valid.ts <- window(sales.ts, start = c(1995, nTrain + 1), end = c(1995, nTrain + nValid))
+
+
+
+```
+
+
+##Question 8
+
+Run a regression model with log(Sales) as the output variable and with a linear trend and monthly predictors:
+
+train.lm.B<- tslm(train.ts ~ trend + season, lambda = 0)
+
+Use this model to forecast the sales in January 2001
+
+
+
+```{r}
+library(forecast)
+
+train.lm.B <- tslm(train.ts ~ trend + season, lambda = 0)
+
+forecasted_sales <- forecast(train.lm.B, h = 1)
+
+forecasted_sales
+
+
+plot(forecasted_sales)
+
+
+
+
+```
+
+##Question 9
+
+We'll use auto.arima() to build a forecasting model on train.ts:
+
+train.arima <-auto.arima(train.ts)
+
+Using train.arima, the forecasted sale for January 2001 is:
+
+```{r}
+train.arima <- auto.arima(train.ts)
+
+forecasted_sales <- forecast(train.arima, h = 1)
+
+forecasted_sales
+
+plot(forecasted_sales)
+
+
+```
+
+
+##Question 10
+
+Next, we'll use auto.arima() on  log(Sales) to build a forecasting model on train.ts:
+
+train.arima.log <-auto.arima(train.ts, lambda=0)
+
+Using train.arima.log, the forecasted sale for January 2001 is:
+
+
+```{r}
+train.arima.log <- auto.arima(train.ts, lambda = 0)
+
+forecasted_sales <- forecast(train.arima.log, h = 1)
+
+forecasted_sales
+
+plot(forecasted_sales)
+```
+
+
+##Question 11
+
+Computing the MAPE for the three models we get:
+
+MAPE for train.lm.B = 
+[ Select ]
+
+MAPE for train.arima = 
+[ Select ]
+
+MAPE for train.arima.log = 
+[ Select ]
+
+Based on the MAPEs, the most appropriate model here would be:
+[ Select ]
+
+
+```{r}
+
+
+MAPE_train.lm.B <- mean(abs((valid.ts - forecasted_sales$mean) / valid.ts)) * 100
+
+MAPE_train.lm.B
+
+
+
+
+MAPE_train.arima <- mean(abs((valid.ts - forecasted_sales$mean) / valid.ts)) * 100
+
+MAPE_train.arima
+
+
+
+
+MAPE_train.arima.log <- mean(abs((valid.ts - forecasted_sales$mean) / valid.ts)) * 100
+
+MAPE_train.arima.log
+
+
+
+
+```
+##Question 12
+
+Now, let's suppose we'll build a regression model based on the entire period (model deployment state), for forecasting Feb 2002
+
+lm.B<- tslm(sales.ts ~ trend + season, lambda = 0)
+
+The forecasted sale for Feb 2002 is:
+
+
+```{r}
+lm.B <- tslm(sales.ts ~ trend + season, lambda = 0)
+
+forecasted_sales <- forecast(lm.B, h = 2)
+
+forecasted_sales
+```
+
+##question 13
+
+Let's suppose we'll build a ARIMA model on log sale for the entire period (model deployment state), to forecast sales in Feb 2002
+
+arima.log <- auto.arima(sales.ts, lambda = 0)
+
+The forecasted sale for Feb 2002 is:
+
+```{r}
+arima.log <- auto.arima(sales.ts, lambda = 0)
+
+forecasted_sales <- forecast(arima.log, h = 2)
+
+forecasted_sales
+
+```
+
+
